@@ -24,23 +24,6 @@ def add_ip():
 			status=500
 		)
 
-@app.route("/ip/naive", methods = ['GET'])
-def get_ip_data_naive():
-	try:
-		page_size = int(request.args.get('count', PAGE_SIZE))
-		page = int(request.args.get('page', 1))
-		ip_data = list(db.ip_data.find().skip( (page-1) * page_size).limit(page_size))
-		return app.response_class(
-			response=dumps(ip_data),
-			status=200,
-			mimetype='application/json'
-		)
-	except Exception, e:
-		return app.response_class(
-			response=str(e),
-			status=500
-		)
-
 @app.route("/ip/spatial", methods = ['GET'])
 def get_ip_data_spatial():
 	try:
@@ -48,14 +31,15 @@ def get_ip_data_spatial():
 		max_lon = (request.args.get('max_lon'))
 		min_lat = (request.args.get('min_lat'))
 		max_lat = (request.args.get('max_lat'))
-
+		print(min_lon)
+		print(max_lon)
+		print(min_lat)
+		print(max_lat)
 		query = {
-			'$and': {
-				'longitude': { '$gte': min_lon },
-				'longitude': { '$lte': max_lon },
-				'latitude':  { '$gte': min_lat },
-				'latitude':  { '$lte': max_lat }
-			}
+			'longitude': { '$gte': min_lon },
+			'longitude': { '$lt': max_lon },
+			'latitude':  { '$gte': min_lat },
+			'latitude':  { '$lt': max_lat }
 		}
 
 		page_size = int(request.args.get('count', PAGE_SIZE))
@@ -75,18 +59,17 @@ def get_ip_data_spatial():
 @app.route("/ip/spatial/count", methods = ['GET'])
 def get_ip_count_spatial():
 	try:
-		min_lon = (request.args.get('min_lon'))
-		max_lon = (request.args.get('max_lon'))
-		min_lat = (request.args.get('min_lat'))
-		max_lat = (request.args.get('max_lat'))
+		min_lon = (float(request.args.get('min_lon')))
+		max_lon = (float(request.args.get('max_lon')))
+		min_lat = (float(request.args.get('min_lat')))
+		max_lat = (float(request.args.get('max_lat')))
 
+		# We filter out any empty long/lat since they just end up being out off the coast of Africa (0,0)
 		query = {
-			'longitude': { '$gte': min_lon },
-			'longitude': { '$lte': max_lon },
-			'latitude':  { '$gte': min_lat },
-			'latitude':  { '$lte': max_lat }
-		
+			'longitude': { '$ne': '', '$gte': min_lon, '$lt': max_lon },
+			'latitude':  { '$ne': '', '$gte': min_lat, '$lt': max_lat }
 		}
+		print(query)
 
 		page_size = int(request.args.get('count', PAGE_SIZE))
 		page = int(request.args.get('page', 1))
@@ -107,6 +90,23 @@ def get_ip_count_spatial():
 def get_ip_count():
 	try:
 		ip_data = db.ip_data.count()
+		return app.response_class(
+			response=dumps(ip_data),
+			status=200,
+			mimetype='application/json'
+		)
+	except Exception, e:
+		return app.response_class(
+			response=str(e),
+			status=500
+		)
+
+@app.route("/ip/naive", methods = ['GET'])
+def get_ip_data_naive():
+	try:
+		page_size = int(request.args.get('count', PAGE_SIZE))
+		page = int(request.args.get('page', 1))
+		ip_data = list(db.ip_data.find().skip( (page-1) * page_size).limit(page_size))
 		return app.response_class(
 			response=dumps(ip_data),
 			status=200,

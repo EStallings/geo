@@ -10,24 +10,33 @@ import * as L from 'leaflet';
 import 'leaflet.heat'
 import { IPData } from '../ipdata';
 
+const API_ROOT = 'http://localhost:5000/';
+
 @Component({
   selector: 'app-heatmap',
   templateUrl: './heatmap.component.html',
   styleUrls: ['./heatmap.component.scss']
 })
 export class HeatmapComponent implements OnInit {
+  private PAGE_SIZE : number = 100;
+  private MAX_PAGES = 10; //limit for performance
+
   private heatmap;
   private map;
-  private pageSize : number = 100;
+
   private pageCount;
   private currentPage = 1;
-  private maxPages = 10; //limit for performance
+
+  private reset : boolean;
+  private currentBounds : L.LatLngBounds;
+
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.map = L.map('mapid').setView([35.9405571,-78.9735071], 10);
+    // Create the map
+    this.map = L.map('mapid').setView([35.9405571,-98.9735071], 5);
 
-    
+    // Draw the map
     L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
       maxZoom: 18,
       attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
@@ -36,27 +45,47 @@ export class HeatmapComponent implements OnInit {
       id: 'mapbox.streets'
     }).addTo(this.map);
     
-    this.heatmap = L.heatLayer([
-      [24, 118, 0.2], // lat, lng, intensity
-      [50.6, 30.4, 0.5],
-    ], {radius: 30}).addTo(this.map);
+    // Create the heatmap
+    this.heatmap = L.heatLayer([], {radius: 30}).addTo(this.map);
 
-    this.map.on('move', e => {
-      console.log(e);
-    })
-    var that = this;
-    const req = this.getIPCount();
+    // Start initial data loading
+    this.initialize();
+    
+    // Register an onmove event handler to kick off a new chain if we move the map by a certain amount
+    this.map.on('move', e => this.monitorBounds());
+  }
+
+  private initialize() {
+    console.log('initializing');
+    this.currentBounds = this.map.getBounds();
+    this.currentBounds.pad(2);
+    this.currentPage = 1;
+    this.reset = true;
+
+    const req = this.getIPCount(this.currentBounds);
     req.subscribe(count => {
-      this.pageCount = Math.ceil(parseInt(count.toString())/this.pageSize);
+      this.pageCount = Math.ceil(parseInt(count.toString())/this.PAGE_SIZE);
       console.log(this.pageCount);
-      getNextPage([]);
     })
+    this.getNextPage([]);
+  }
 
-    function getNextPage(ips: IPData[]) {
-      _.forEach(ips, ip => that.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)))
-      if (that.currentPage < that.pageCount && that.currentPage < that.maxPages) {
-        that.getIPData(that.currentPage++).subscribe(getNextPage);
-      }
+  private getNextPage(ips: IPData[]) {
+    if(this.reset && ips.length) {
+      this.heatmap.setLatLngs(_.map(ips, ip => L.latLng(ip.latitude, ip.longitude, 50)));
+      this.reset = false;
+    } else {
+      _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
+    }
+    if (this.currentPage < this.pageCount && this.currentPage < this.MAX_PAGES) {
+      var bounds : L.LatLngBounds = this.map.getBounds();
+      this.getIPDataPositional(bounds, this.currentPage++,).subscribe(x => this.getNextPage(x));
+    }
+  }
+
+  private monitorBounds() {
+    if(!this.currentBounds.overlaps(this.map.getBounds())) {
+      this.initialize();
     }
   }
 
@@ -76,22 +105,31 @@ export class HeatmapComponent implements OnInit {
       'Something bad happened; please try again later.');
   };
 
-  
-
-  getIPCount() {
-    return this.http.get('http://localhost:5000/ip/count')
+  getIPCount(bounds: L.LatLngBounds) {
+    console.log(bounds);
+    const options = { params: new HttpParams()
+      .set('min_lat', bounds.getSouth().toString())
+      .set('max_lat', bounds.getNorth().toString())
+      .set('min_lon', bounds.getWest().toString())
+      .set('max_lon', bounds.getEast().toString())
+    }
+    return this.http.get(API_ROOT + 'ip/spatial/count', options)
       .pipe(
         catchError(this.handleError)
       );
   }
 
-  getIPData(page): Observable<IPData[]> {
-    const params = new HttpParams();
-    params.set('page', page);
-    params.set('size', this.pageSize.toString());
-    const options = { params }
+  getIPDataPositional(bounds: L.LatLngBounds, page): Observable<IPData[]> {
+    const options = { params: new HttpParams()
+      .set('page', page)
+      .set('size', this.PAGE_SIZE.toString())
+      .set('min_lat', bounds.getSouth().toString())
+      .set('max_lat', bounds.getNorth().toString())
+      .set('min_lon', bounds.getWest().toString())
+      .set('max_lon', bounds.getEast().toString())
+    }
 
-    return this.http.get<IPData[]>('http://localhost:5000/ip', options)
+    return this.http.get<IPData[]>(API_ROOT + 'ip/spatial', options)
       .pipe(
         catchError(this.handleError)
       );
