@@ -27,24 +27,22 @@ def add_ip():
 @app.route("/ip/spatial", methods = ['GET'])
 def get_ip_data_spatial():
 	try:
-		min_lon = (request.args.get('min_lon'))
-		max_lon = (request.args.get('max_lon'))
-		min_lat = (request.args.get('min_lat'))
-		max_lat = (request.args.get('max_lat'))
-		print(min_lon)
-		print(max_lon)
-		print(min_lat)
-		print(max_lat)
-		query = {
-			'longitude': { '$gte': min_lon },
-			'longitude': { '$lt': max_lon },
-			'latitude':  { '$gte': min_lat },
-			'latitude':  { '$lt': max_lat }
-		}
-
 		page_size = int(request.args.get('count', PAGE_SIZE))
 		page = int(request.args.get('page', 1))
-		ip_data = list(db.ip_data.find(query).skip( (page-1) * page_size).limit(page_size))
+		skip =  (page-1) * page_size
+
+		min_lon = (float(request.args.get('min_lon')))
+		max_lon = (float(request.args.get('max_lon')))
+		min_lat = (float(request.args.get('min_lat')))
+		max_lat = (float(request.args.get('max_lat')))
+		query = {
+			'longitude': { '$ne': '', '$gte': min_lon, '$lt': max_lon },
+			'latitude':  { '$ne': '', '$gte': min_lat, '$lt': max_lat }
+		}
+		print(query)
+		print(skip)
+		print(page_size)
+		ip_data = list(db.ip_data.find(query).skip(skip).limit(page_size))
 		return app.response_class(
 			response=dumps(ip_data),
 			status=200,
@@ -69,7 +67,6 @@ def get_ip_count_spatial():
 			'longitude': { '$ne': '', '$gte': min_lon, '$lt': max_lon },
 			'latitude':  { '$ne': '', '$gte': min_lat, '$lt': max_lat }
 		}
-		print(query)
 
 		page_size = int(request.args.get('count', PAGE_SIZE))
 		page = int(request.args.get('page', 1))

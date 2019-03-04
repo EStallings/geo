@@ -18,7 +18,7 @@ const API_ROOT = 'http://localhost:5000/';
   styleUrls: ['./heatmap.component.scss']
 })
 export class HeatmapComponent implements OnInit {
-  private PAGE_SIZE : number = 100;
+  private PAGE_SIZE : number = 5000;
   private MAX_PAGES = 10; //limit for performance
 
   private heatmap;
@@ -67,21 +67,27 @@ export class HeatmapComponent implements OnInit {
       this.pageCount = Math.ceil(parseInt(count.toString())/this.PAGE_SIZE);
       console.log(this.pageCount);
     })
-    this.getNextPage([]);
+
+    var bounds : L.LatLngBounds = this.map.getBounds();
+    this.getIPDataPositional(bounds, 1).subscribe(ips => {
+        _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
+        this.reset = false;
+    });
+    // this.getNextPage([]);
   }
 
-  private getNextPage(ips: IPData[]) {
-    if(this.reset && ips.length) {
-      this.heatmap.setLatLngs(_.map(ips, ip => L.latLng(ip.latitude, ip.longitude, 50)));
-      this.reset = false;
-    } else {
-      _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
-    }
-    if (this.currentPage < this.pageCount && this.currentPage < this.MAX_PAGES) {
-      var bounds : L.LatLngBounds = this.map.getBounds();
-      this.getIPDataPositional(bounds, this.currentPage++,).subscribe(x => this.getNextPage(x));
-    }
-  }
+  // private getNextPage(ips: IPData[]) {
+  //   if(this.reset && ips.length) {
+  //     this.heatmap.setLatLngs(_.map(ips, ip => L.latLng(ip.latitude, ip.longitude, 50)));
+  //     this.reset = false;
+  //   } else {
+  //     _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
+  //   }
+  //   if (this.currentPage < this.pageCount && this.currentPage < this.MAX_PAGES) {
+  //     var bounds : L.LatLngBounds = this.map.getBounds();
+  //     this.getIPDataPositional(bounds, this.currentPage++).subscribe(x => this.getNextPage(x));
+  //   }
+  // }
 
   private monitorBounds() {
     if(!this.currentBounds.overlaps(this.map.getBounds())) {
