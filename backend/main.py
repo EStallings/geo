@@ -39,10 +39,12 @@ def get_ip_data_spatial():
 			'longitude': { '$ne': '', '$gte': min_lon, '$lt': max_lon },
 			'latitude':  { '$ne': '', '$gte': min_lat, '$lt': max_lat }
 		}
+		project = { 'longitude':1, 'latitude':1 }
+
 		print(query)
 		print(skip)
 		print(page_size)
-		ip_data = list(db.ip_data.find(query).skip(skip).limit(page_size))
+		ip_data = list(db.ip_data.find(query, project).skip(skip).limit(page_size))
 		return app.response_class(
 			response=dumps(ip_data),
 			status=200,

@@ -18,7 +18,7 @@ const API_ROOT = 'http://localhost:5000/';
   styleUrls: ['./heatmap.component.scss']
 })
 export class HeatmapComponent implements OnInit {
-  private PAGE_SIZE : number = 5000;
+  private PAGE_SIZE : number = 500;
   private MAX_PAGES = 10; //limit for performance
 
   private heatmap;
@@ -46,13 +46,14 @@ export class HeatmapComponent implements OnInit {
     }).addTo(this.map);
     
     // Create the heatmap
-    this.heatmap = L.heatLayer([], {radius: 30}).addTo(this.map);
+    this.heatmap = L.heatLayer([], {radius: 15}).addTo(this.map);
 
     // Start initial data loading
     this.initialize();
     
     // Register an onmove event handler to kick off a new chain if we move the map by a certain amount
-    this.map.on('move', e => this.monitorBounds());
+    this.map.on('moveend', e => this.monitorBounds());
+    this.map.on('zoomend', e => this.monitorBounds());
   }
 
   private initialize() {
@@ -62,32 +63,24 @@ export class HeatmapComponent implements OnInit {
     this.currentPage = 1;
     this.reset = true;
 
-    const req = this.getIPCount(this.currentBounds);
-    req.subscribe(count => {
-      this.pageCount = Math.ceil(parseInt(count.toString())/this.PAGE_SIZE);
-      console.log(this.pageCount);
-    })
-
     var bounds : L.LatLngBounds = this.map.getBounds();
-    this.getIPDataPositional(bounds, 1).subscribe(ips => {
-        _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
-        this.reset = false;
-    });
-    // this.getNextPage([]);
+    this.getIPDataPositional(bounds, this.currentPage++).subscribe(x => this.getNextPage(x));
   }
 
-  // private getNextPage(ips: IPData[]) {
-  //   if(this.reset && ips.length) {
-  //     this.heatmap.setLatLngs(_.map(ips, ip => L.latLng(ip.latitude, ip.longitude, 50)));
-  //     this.reset = false;
-  //   } else {
-  //     _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 50)));
-  //   }
-  //   if (this.currentPage < this.pageCount && this.currentPage < this.MAX_PAGES) {
-  //     var bounds : L.LatLngBounds = this.map.getBounds();
-  //     this.getIPDataPositional(bounds, this.currentPage++).subscribe(x => this.getNextPage(x));
-  //   }
-  // }
+  private getNextPage(ips: IPData[]) {
+    if(ips.length) {
+      if(this.reset) {
+        this.heatmap.setLatLngs(_.map(ips, ip => L.latLng(ip.latitude, ip.longitude, 10)));
+        this.reset = false;
+      } else {
+        _.forEach(ips, ip => this.heatmap.addLatLng(L.latLng(ip.latitude, ip.longitude, 10)));
+      }
+    }
+    if (ips.length) {
+      var bounds : L.LatLngBounds = this.map.getBounds();
+      this.getIPDataPositional(bounds, this.currentPage++).subscribe(x => this.getNextPage(x));
+    }
+  }
 
   private monitorBounds() {
     if(!this.currentBounds.overlaps(this.map.getBounds())) {
@@ -128,7 +121,7 @@ export class HeatmapComponent implements OnInit {
   getIPDataPositional(bounds: L.LatLngBounds, page): Observable<IPData[]> {
     const options = { params: new HttpParams()
       .set('page', page)
-      .set('size', this.PAGE_SIZE.toString())
+      .set('count', this.PAGE_SIZE.toString())
       .set('min_lat', bounds.getSouth().toString())
       .set('max_lat', bounds.getNorth().toString())
       .set('min_lon', bounds.getWest().toString())
